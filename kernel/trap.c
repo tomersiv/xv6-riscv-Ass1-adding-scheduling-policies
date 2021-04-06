@@ -163,7 +163,12 @@ void
 clockintr()
 {
   acquire(&tickslock);
+
+  // task 3 - update performance stats
+  updatePerformance();
+    
   ticks++;
+
   wakeup(&ticks);
   release(&tickslock);
 }
