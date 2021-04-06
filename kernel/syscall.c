@@ -104,6 +104,10 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+// task 2 - trace system call definition
+extern uint64 sys_trace(void);
+// task 3 - wait_stat system call definition
+extern uint64 sys_wait_stat(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -127,6 +131,36 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+//task 2 - adding to sys calls array
+[SYS_trace]   sys_trace,
+//task 3 - adding to sys calls array
+[SYS_wait_stat] sys_wait_stat,
+};
+
+static char *sys_names[] = {
+[SYS_fork]    "fork",
+[SYS_exit]    "exit",
+[SYS_wait]    "wait",
+[SYS_pipe]    "pipe",
+[SYS_read]    "read",
+[SYS_kill]    "kill",
+[SYS_exec]    "exec",
+[SYS_fstat]   "fstat",
+[SYS_chdir]   "chdir",
+[SYS_dup]     "dup",
+[SYS_getpid]  "getpid",
+[SYS_sbrk]    "sbrk",
+[SYS_sleep]   "sleep",
+[SYS_uptime]  "uptime",
+[SYS_open]    "open",
+[SYS_write]   "write",
+[SYS_mknod]   "mknod",
+[SYS_unlink]  "unlink",
+[SYS_link]    "link",
+[SYS_mkdir]   "mkdir",
+[SYS_close]   "close",
+[SYS_trace]   "trace",
+[SYS_wait_stat] "wait_stat",
 };
 
 void
@@ -137,7 +171,20 @@ syscall(void)
 
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    int arg;
+
+    // task 1 - handling prints in system call 'trace'
+    arg = p->trapframe->a0; // save arg for the 3 special system calls
     p->trapframe->a0 = syscalls[num]();
+    if (p->mask > 0) {
+      if (((1 << num) & (p->mask)) != 0) { // Checks if the system call needs to be traced
+        if(num == SYS_fork || num == SYS_sbrk || num == SYS_kill) {
+          printf("%d: syscall %s %d -> %d\n", p->pid, sys_names[num], arg, p->trapframe->a0);
+        } else {
+          printf("%d: syscall %s -> %d\n", p->pid, sys_names[num], p->trapframe->a0);
+        }
+      }
+    }
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);

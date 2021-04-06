@@ -95,3 +95,26 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// task 2 - checking for errors
+uint64
+sys_trace(void)
+{
+  int mask, pid;
+  if(argint(0, &mask) < 0 || argint(1, &pid) < 0)
+    return -1;
+  return trace(mask, pid);
+  return 0;
+}
+
+// task 3 - checking for errors
+uint64
+sys_wait_stat(void)
+{
+  int *status;
+  struct perf *performance;
+  if(argaddr(0, (uint64 *)&status) < 0 || argaddr(1, (uint64 *)&performance) < 0)
+    return -1;
+  return wait_stat(status, performance);
+  return 0;
+}

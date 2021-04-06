@@ -140,7 +140,18 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  
+  // task 2 - intiate process trace mask
+  p->mask = 0;
+  
+  // task 3 - initiate process creation time
+  p->performance.ctime = ticks;
+  p->performance.ttime = 0;
+  p->performance.stime = 0;
+  p->performance.retime = 0;
+  p->performance.rutime = 0;
+  p->performance.average_bursttime = QUANTUM * 100;
+  
   return p;
 }
 
@@ -243,6 +254,10 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  
+  // task 4.2 - updates when the process became runnable
+  p->fcfs_time = ticks;
+
 
   release(&p->lock);
 }
@@ -295,6 +310,9 @@ fork(void)
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
 
+  // task 2 - copy parent Mask to child Mask
+  np->mask = p->mask;
+
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -313,6 +331,10 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  
+  // task 4.2
+  np->fcfs_time = ticks;
+
   release(&np->lock);
 
   return pid;
@@ -370,6 +392,9 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+
+  // task 3 - update termination time
+  p->performance.ttime = ticks;
 
   release(&wait_lock);
 
@@ -437,6 +462,7 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
+#ifdef DEFAULT
   struct proc *p;
   struct cpu *c = mycpu();
   
@@ -462,7 +488,80 @@ scheduler(void)
       release(&p->lock);
     }
   }
+#endif
+
+#ifdef FCFS
+  struct proc *p;
+  struct cpu *c = mycpu();
+  
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+    struct proc *first = 0;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      if(p->state == RUNNABLE) {
+        if (first == 0 || first->fcfs_time > p->fcfs_time)
+        {
+          first = p;
+        }
+      }
+    }
+    
+    if (first != 0) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        acquire(&first->lock);
+        first->state = RUNNING;
+        c->proc = first;
+        swtch(&c->context, &first->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        release(&first->lock);
+    }
+  } 
+#endif
+
+#ifdef SRT
+  struct proc *p;
+  struct cpu *c = mycpu();
+  
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+    struct proc *first = 0;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      if(p->state == RUNNABLE) {
+        if (first == 0 || first->performance.average_bursttime > p->performance.average_bursttime)
+        {
+          first = p;
+        }
+      }
+    }
+    
+    if (first != 0) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        acquire(&first->lock);
+        first->state = RUNNING;
+        first->srt_time = ticks;
+        c->proc = first;
+        swtch(&c->context, &first->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        release(&first->lock);
+    }
+  } 
+#endif
 }
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -498,6 +597,14 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+
+  // task 4.3 - updates when the process finished a burst
+  p->performance.average_bursttime = 
+    ALPHA * (ticks - p->srt_time) + (100 - ALPHA) *p->performance.average_bursttime / 100;
+  
+  // task 4.2
+  p->fcfs_time = ticks;
+  
   sched();
   release(&p->lock);
 }
@@ -544,6 +651,10 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
 
+  // task 4.3 - updates when the process finished a burst
+  p->performance.average_bursttime = 
+    ALPHA * (ticks - p->srt_time) + (100 - ALPHA) *p->performance.average_bursttime / 100;
+
   sched();
 
   // Tidy up.
@@ -566,6 +677,9 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        
+        // task 4.2
+        p->fcfs_time = ticks;
       }
       release(&p->lock);
     }
@@ -587,6 +701,9 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+
+        // task 4.2
+        p->fcfs_time = ticks;
       }
       release(&p->lock);
       return 0;
@@ -652,5 +769,90 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+
+// task 2 - save process mask
+int
+trace(int mask, int pid){
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid){
+      p->mask = mask;
+      release(&p->lock);
+      return 0;
+    }
+    release(&p->lock);
+  }
+  return -1;
+}
+
+// task 3 - wait_stat system call
+int
+wait_stat(int *status,struct perf *performance)
+{
+  struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+
+  acquire(&wait_lock);
+
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+
+        havekids = 1;
+        if(np->state == ZOMBIE){
+          // Found one.
+          pid = np->pid;
+
+          if((status != 0) & 
+             (copyout(p->pagetable, (uint64)status, (char *)&np->xstate, sizeof(int)) < 0)
+              &
+             // task 3 - copy performance structure from kernel to user 
+             (copyout(p->pagetable, (uint64)performance, (char *)&np->performance, sizeof(np->performance)) < 0)) {
+             release(&np->lock);
+             release(&wait_lock);
+             return -1;
+          }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+    
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
+// task 3 - update the performance
+void
+updatePerformance(){
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    if (p->state == SLEEPING){
+        (p->performance.stime)++;
+    }
+    else if (p->state == RUNNABLE) {
+      (p->performance.retime)++;
+    }
+    else if (p->state == RUNNING){
+      (p->performance.rutime)++;
+    }
   }
 }

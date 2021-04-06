@@ -36,3 +36,7 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+# task 2
+entry("trace");
+# task 3
+entry("wait_stat");
