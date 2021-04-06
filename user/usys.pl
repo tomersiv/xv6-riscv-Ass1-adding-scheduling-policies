@@ -40,3 +40,5 @@ entry("uptime");
 entry("trace");
 # task 3
 entry("wait_stat");
+# task 4.4
+entry("set_priority");

@@ -151,6 +151,9 @@ found:
   p->performance.retime = 0;
   p->performance.rutime = 0;
   p->performance.average_bursttime = QUANTUM * 100;
+
+  // task 4.4 - initiate process priority
+  p->priority = 3;
   
   return p;
 }
@@ -334,6 +337,9 @@ fork(void)
   
   // task 4.2
   np->fcfs_time = ticks;
+
+  // task 4.4
+  np->priority = p->priority;
 
   release(&np->lock);
 
@@ -560,6 +566,44 @@ scheduler(void)
     }
   } 
 #endif
+
+#ifdef CFSD
+  struct proc *p;
+  struct cpu *c = mycpu();
+  
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+    struct proc *first = 0;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      if(p->state == RUNNABLE) {
+        if (first == 0 || 
+        (first->performance.rutime * first->priority) / (first->performance.rutime + first->performance.stime) 
+        >
+        (p->performance.rutime * p->priority) / (p->performance.rutime + p->performance.stime))
+        {
+          first = p;
+        }
+      }
+    }
+    
+    if (first != 0) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        acquire(&first->lock);
+        first->state = RUNNING;
+        c->proc = first;
+        swtch(&c->context, &first->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        release(&first->lock);
+    }
+  } 
+#endif
 }
 
 
@@ -601,7 +645,7 @@ yield(void)
   // task 4.3 - updates when the process finished a burst
   p->performance.average_bursttime = 
     ALPHA * (ticks - p->srt_time) + (100 - ALPHA) *p->performance.average_bursttime / 100;
-  
+
   // task 4.2
   p->fcfs_time = ticks;
   
@@ -855,4 +899,12 @@ updatePerformance(){
       (p->performance.rutime)++;
     }
   }
+}
+
+// task 4.4 - update priority
+int
+set_priority(int priority){
+  struct proc *p = myproc();
+  p->priority = priority;
+  return 0;
 }

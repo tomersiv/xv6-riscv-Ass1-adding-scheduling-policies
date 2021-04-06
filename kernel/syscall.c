@@ -108,6 +108,8 @@ extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
 // task 3 - wait_stat system call definition
 extern uint64 sys_wait_stat(void);
+// task 4 - set_priority system call definition
+extern uint64 sys_set_priority(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -131,10 +133,12 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-//task 2 - adding to sys calls array
+// task 2 - adding to sys calls array
 [SYS_trace]   sys_trace,
-//task 3 - adding to sys calls array
+// task 3 - adding to sys calls array
 [SYS_wait_stat] sys_wait_stat,
+// task4 - adding to sys calls array
+[SYS_set_priority] sys_set_priority,
 };
 
 static char *sys_names[] = {
@@ -161,6 +165,7 @@ static char *sys_names[] = {
 [SYS_close]   "close",
 [SYS_trace]   "trace",
 [SYS_wait_stat] "wait_stat",
+[SYS_set_priority] "set_priority"
 };
 
 void

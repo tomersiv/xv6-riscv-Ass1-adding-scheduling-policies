@@ -29,6 +29,8 @@ int uptime(void);
 int trace(int, int);
 // task 3 - wait_stat declaration
 int wait_stat(int *status, struct perf *performance);
+// task 4.4 - set_priotiy declaration
+int set_priority(int priority);
 
 // ulib.c
 int stat(const char*, struct stat*);
