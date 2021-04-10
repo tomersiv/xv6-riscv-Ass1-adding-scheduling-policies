@@ -2,5 +2,6 @@
     "files.associations": {
         "syscall.h": "c",
         "defs.h": "c"
-    }
+    },
+    "C_Cpp.dimInactiveRegions": false
 }
