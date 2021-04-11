@@ -571,8 +571,8 @@ void scheduler(void)
 #endif
 
 #ifdef CFSD
-          sched_condition = (p->performance.rutime * decay_factor[p->priority]) / (p->performance.rutime + p->performance.stime) <
-                            (scheduled_process->performance.rutime * decay_factor[scheduled_process->priority]) / (scheduled_process->performance.rutime + scheduled_process->performance.stime);
+          sched_condition = (p->performance.rutime * decay_factor[p->priority-1]) / (p->performance.rutime + p->performance.stime) <
+                            (scheduled_process->performance.rutime * decay_factor[scheduled_process->priority-1]) / (scheduled_process->performance.rutime + scheduled_process->performance.stime);
 #endif
           if (sched_condition)
           {

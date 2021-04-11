@@ -138,7 +138,7 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_tests\
-	$U/_set_priority\
+	$U/_test\
 
 
 
