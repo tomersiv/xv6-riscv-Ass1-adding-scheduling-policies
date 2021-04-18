@@ -131,7 +131,7 @@ struct proc
 
   int mask;                   // task 2 - mask for use in trace syscall
   struct perf performance;    // task 3 - Save performance stats
-  int fcfs_time;              // task 4.2 - the last tick the process became runnable
+  uint64 fcfs_time;              // task 4.2 - the last tick the process became runnable
   int srt_time;               // task 4.3 - the last burst time of the process
   int priority;               // task 4.4 - the process peiority
 };

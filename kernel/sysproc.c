@@ -122,7 +122,7 @@ uint64
 sys_set_priority(void)
 {
   int priority;
-  if(argint(0, &priority) < 1 || argint(0, &priority) > 5)
+  if(argint(0, &priority) < 0 || priority < 1 || priority > 5)
     return -1;
   return set_priority(priority);
 }
